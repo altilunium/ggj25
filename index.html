@@ -48,6 +48,14 @@
       text-decoration: none;
       color:blue;
     }
+
+    #compass {
+      position:fixed;
+      z-index: 9999;
+      right:0;
+      bottom:50 px;
+      width:100px;
+    }
   </style>
 </head>
 <body>
@@ -55,6 +63,17 @@
 <div id="panels">
   <p id="conzole"></p>
 </div>
+
+<svg id="compass" viewBox="0 0 100 100">
+            <!-- Outer circle for the compass -->
+            <circle cx="50" cy="50" r="48" stroke="black" stroke-width="2" fill="white" />
+            
+            <!-- Compass needle -->
+            <polygon id="needle" points="50,50 50,5 52,50" fill="red" />
+            
+            <!-- Center circle -->
+            <circle cx="50" cy="50" r="2" fill="black" />
+        </svg>
 
 <div class="main">
   <div id="map"></div>
@@ -91,6 +110,8 @@
   var globalSteps = 100
   var globalINT = 11
   var stepPenalty = 0.005
+  var trueGoal
+  var currentDirection 
   isINTunlocked = false
   var inventory = new Set()
   isBurger = false
@@ -288,11 +309,65 @@ function nomention(x){
   }
 }
 
+function rotateNeedle(degree) {
+            const needle = document.getElementById('needle');
+            needle.setAttribute('transform', `rotate(${degree} 50 50)`);
+        }
+
+
+
+function getDestinationCoordinate(lat, lon, direction, distanceKm = 10) {
+    const earthRadiusKm = 6371; // Radius of Earth in kilometers
+
+    // Convert input values to radians
+    const toRadians = (degree) => degree * Math.PI / 180;
+    const toDegrees = (radian) => radian * 180 / Math.PI;
+
+    const latRad = toRadians(lat);
+    const lonRad = toRadians(lon);
+    const directionRad = toRadians(direction);
+
+    // Calculate the new latitude
+    const newLatRad = Math.asin(
+        Math.sin(latRad) * Math.cos(distanceKm / earthRadiusKm) +
+        Math.cos(latRad) * Math.sin(distanceKm / earthRadiusKm) * Math.cos(directionRad)
+    );
+
+    // Calculate the new longitude
+    const newLonRad = lonRad + Math.atan2(
+        Math.sin(directionRad) * Math.sin(distanceKm / earthRadiusKm) * Math.cos(latRad),
+        Math.cos(distanceKm / earthRadiusKm) - Math.sin(latRad) * Math.sin(newLatRad)
+    );
+
+    // Convert radians back to degrees
+    const newLat = toDegrees(newLatRad);
+    const newLon = toDegrees(newLonRad);
+
+    return { lat: newLat, lng: newLon };
+}
 
 
 function setDirection(lat, lon) {
     const radius = 10; // 10 kilometers
-    const randomDirection = Math.random() * 360; // Random direction in degrees
+     
+
+    // Generate a pseudo-random number using the seed
+    // We'll take the modulo 360 to ensure the value is within 0-360
+      const now = new Date();
+    const hours = now.getHours();      // Hours (0-23)
+    const minutes = now.getMinutes();  // Minutes (0-59)
+    const seconds = now.getSeconds();  // Seconds (0-59)
+    const milliseconds = now.getMilliseconds(); // Milliseconds (0-999)
+
+    // Combine the time components into a single seed value
+    const seed = (hours * 3600 + minutes * 60 + seconds) * 1000 + milliseconds;
+
+    // Use the seed to generate a direction (modulo 360 for 0-360°)
+    const randomDirection = seed % 360;
+    console.log("DIRECTION ! ",randomDirection)
+
+    return getDestinationCoordinate(lat, lon, randomDirection) 
+    /*
     
     // Earth's radius in kilometers
     const earthRadius = 6371; 
@@ -312,7 +387,36 @@ function setDirection(lat, lon) {
     const newLat = newLatRad * 180 / Math.PI;
     const newLon = newLonRad * 180 / Math.PI;
 
-    return { lat: newLat, lon: newLon };
+    return { lat: newLat, lng: newLon };
+    */
+}
+
+
+function calcdirection(latA, lonA, latB, lonB) {
+    // Convert degrees to radians
+    console.log(latA,lonA,latB,lonB)
+    const latARad = latA * Math.PI / 180;
+    const lonARad = lonA * Math.PI / 180;
+    const latBRad = latB * Math.PI / 180;
+    const lonBRad = lonB * Math.PI / 180;
+
+    // Calculate the difference in longitudes
+    const deltaLon = lonBRad - lonARad;
+
+    // Calculate the direction in radians using the Haversine formula
+    const y = Math.sin(deltaLon) * Math.cos(latBRad);
+    const x = Math.cos(latARad) * Math.sin(latBRad) - Math.sin(latARad) * Math.cos(latBRad) * Math.cos(deltaLon);
+
+    // Calculate the initial bearing (in radians)
+    let bearingRad = Math.atan2(y, x);
+
+    // Convert the bearing from radians to degrees
+    let bearingDeg = bearingRad * 180 / Math.PI;
+
+    // Normalize the bearing to 0-360 degrees
+    bearingDeg = (bearingDeg + 360) % 360;
+
+    return bearingDeg;
 }
 
 
@@ -659,6 +763,9 @@ function onMapClick(e) {
 
     
     createOrMoveBubble(e.latlng);
+    trueGoal =  setDirection(wrapped.lat,wrapped.lng)
+    console.log("True goal",trueGoal)
+
 
 
 
@@ -735,7 +842,13 @@ function startMovingBubble(direction) {
 
         if (newLatLng) {
             bubble.setLatLng(newLatLng);
+            currentDirection = calcdirection(newLatLng.lat,newLatLng.lng,trueGoal.lat,trueGoal.lng)
+            console.log("C1",newLatLng.lat,newLatLng.lng)
+            console.log("C2",trueGoal.lat,trueGoal.lng)
+            console.log("Direction",currentDirection)
+            rotateNeedle(currentDirection)
             inspector(newLatLng);
+
             oldCoord = newLatLng
         }
     }, 10); // Adjust interval speed as needed
