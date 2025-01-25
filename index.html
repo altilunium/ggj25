@@ -4,10 +4,15 @@
   <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>???</title>
+  <title>Bubble World Wanderer</title>
   <link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <script src="leaflet.js"></script>
+   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+<link rel="stylesheet" href="bootstrap.css">
+  <script src="bootbox.js"></script>
   <script src="protomaps-leaflet.js"></script> 
   <script src="https://unpkg.com/leaflet-hash@0.2.1/leaflet-hash.js"></script>
   <style>
@@ -58,20 +63,32 @@
     }
     #meterz {
       position: fixed;
-    top: 105px;
-    right: 3px;
+    top: 113px;
+    right: 6px;
     background-color: white;
     z-index: 9999999;
-    width: 90px;
-    height: 20px;
+    width: 93px;
+    height: 32px;
     border: 2px solid;
+    font-size: 18px;
+    font-weight: 800;
+    text-align: center;
     }
+
+    .modal-dialog {
+    max-width: 1000px;  /* Adjust this value to set your desired width */
+    width: 100%;       /* Ensures the modal is responsive */
+}
   </style>
 </head>
 <body>
 
+<img src="log.png" style="position:fixed;width:100%;height:100%;z-index:999999999999;top:0px;left:0px" onclick="this.style.display='none';">
+  
+
+
 <div id="panels">
-  <p id="conzole"></p>
+  <p id="conzole">Pick any map coordinate as your spawn location. Click the position to select it.</p>
 </div>
 
 <svg id="compass" viewBox="0 0 100 100">
@@ -132,6 +149,9 @@
   isCheckpoint = false
   isBicycle= false
   isInventory = false
+  isPlaced = false
+  isConvenience = false
+  isSportcenter = false
 
 
   const map = L.map('map');
@@ -628,6 +648,12 @@ function calcdirection(latA, lonA, latB, lonB) {
     const meterz = document.getElementById("meterz");
     meterz.innerHTML = currentDistance
     isCheckpoint = true
+    //alert("Congratulations! You have discovered a long-awaited checkpoint on your journey. Now, continue onward with purpose, for there is yet another to uncover.")
+
+
+     bootbox.alert("<tr><td><img src='man2.png'></td><td style='vertical-align:top'>Ah, congratulations, brave soul! You've finally arrived at your destination, victorious and unscathed, or at least mostly unscathed!<br><br>Alas, it appears the grand treasure has eluded you this time.<br><br>But fret not! For though the glittering prize is not here, you do find the faintest of clues—whispers of where it might have wandered off to.<br><br> The journey is far from over, my friend. So, steel yourself, gather your courage, and continue forth. Remember, the road to glory is paved with setbacks, mishaps, and the occasional misplaced treasure chest. <br><br>Keep going, and never, ever give up!</td></tr>");
+
+
     }
 
     if (isCheckpoint) {
@@ -652,6 +678,12 @@ zHT = zHT + "</i><br>"
 if (zHT.includes("landuse residential")){
     zHT = zHT + "You step into a quiet, secluded residential enclave. The residents, watching from behind, eye you warily. Strangers are unwelcome in this close-knit corner of the world.<br><br>"
 }
+
+if (zHT.includes("highway residential")){
+    zHT = zHT + "You are entering a deeply tranquil residential road, so quiet that not a single vehicle stirs, nor does a soul walk its length—save for you. This solitary path is the domain of the few local residents, seldom trodden by the feet of any other, as if it exists in peaceful isolation from the world beyond.<br><br>"
+}
+
+
 
 if (zHT.includes("streets living_street")){
     zHT = zHT + "As you step onto the bustling street, it seems to pulse with life. The air hums with the laughter and chatter of children, their playful voices echoing through the vibrant scene. They dart across the living street like carefree birds, oblivious to the world around them. You must tread carefully, your every step weighed with the awareness that a single misstep could disrupt the delicate dance of their joy.<br><br>"
@@ -696,16 +728,40 @@ if (zHT.includes("cuisine burger")){
     isInventory = true
 }
 if (zHT.includes("bicycle yes")){
+
+  /*
     zHT = zHT + "A young boy, accompanied by a lively group of his friends, approaches you with a confident stride. His eyes gleam with mischief as he calls out, 'Hey there! How about a free bike? Take this—it's yours!' His voice is filled with the eager excitement of someone offering a gift, as his friends cheer quietly behind him, watching the exchange unfold.<br><br>"
     zHT = zHT + "You received an ACRO BIKE! Your movement speed is moderately improved!<br><br>"
-    inventory.add("ACRO BIKE")
+  */
+   
     isInventory = true
     if (!isBicycle){
+         bootbox.alert("<h1>bicycle=yes</h1><br><i>Roads and other objects accessible to cyclists, but not explicitly designated/signed for their use</i><br><hr>A young boy, accompanied by a lively group of his friends, approaches you with a confident stride. His eyes gleam with mischief as he calls out, 'Hey there! How about a free bike? Take this—it's yours!' His voice is filled with the eager excitement of someone offering a gift, as his friends cheer quietly behind him, watching the exchange unfold.<br><br>You received a BIKE! Your movement speed is moderately improved!");
+
+    inventory.add("BIKE")
       isBicycle = true
       stepPenalty = 0.0048
     }
     
 }
+
+if (zHT.includes("shop convenience")){
+  if (!isConvenience){
+    bootbox.alert('<h1>shop=convenience</h1><br><i>A small local shop carrying a variety of everyday products, such as packaged food and hygiene products.</i><br><hr>In the sweltering heat of the blazing sun, you catch sight of a convenience store in the distance. Drawn by the promise of respite, you step inside, seeking to cool your weary body, though with no intention of making a purchase. The storekeeper, his patience worn thin, regards you with a hint of mild annoyance.');
+  isConvenience = true
+  }   
+}
+
+if (zHT.includes("leisure sports_centre")){
+  if (!isSportcenter){
+    bootbox.alert('<h1>leisure=sports_centre</h1><br><i>A sports centre is a distinct facility where sports take place within an enclosed area.</i><br><hr>You witness a lively commotion within the sports center—shouts of players, cheers of the crowd, the vibrant pulse of the event filling the air. The parking lot nearby overflows with vehicles, each one a silent testament to the energy and excitement within.');
+    map.invalidateSize();
+  isSportcenter = true
+  }   
+}
+
+
+
 
 
 
@@ -750,7 +806,7 @@ element.innerHTML = zHT
     else{
       console.log("ILLEGAL MOVE")
       bubble.setLatLng(oldCoord)
-      element.innerHTML = "Access denied!"
+      element.innerHTML = "Access denied!<br>Remember that, for now, you can only move close to the road."
       
     }
 
@@ -804,6 +860,11 @@ function getMovedCoordinate(currentCoord, coordList, direction) {
 
 
 function onMapClick(e) {
+
+    if (isPlaced){
+      return 0
+    }
+
     
     const wrapped = map.wrapLatLng(e.latlng);
     const sourceToFeatures = layer.queryTileFeaturesDebug(wrapped.lng, wrapped.lat).get("");
@@ -847,6 +908,11 @@ function onMapClick(e) {
     console.log("True goal",trueGoal)
     inspector(e.latlng)
 
+    map.setMaxZoom(18); // Set the new maximum zoom level
+    map.setMinZoom(18);
+    isPlaced = true
+
+    bootbox.alert("<tr><td><img src='man1.png'></td><td style='vertical-align:top'>Welcome, noble wanderer, to the enchanting realm of Bubble World.<br><br>You stand on the threshold of a grand adventure, embarking on a quest to uncover treasures beyond your wildest dreams. Let the compass, nestled at the top right of your screen, be your guiding star as you seek the fabled riches that await. But beware—your vitality is not endless, and you may find yourself in need of rest and healing along the way. <br><br>Use the WASD keys to traverse this world, and the arrow buttons to explore the map's farthest corners. <br><br>May your journey be filled with wonder and discovery. Happy wandering!</td></tr>");
 
   }
 
@@ -937,6 +1003,8 @@ function startMovingBubble(direction) {
             inspector(newLatLng);
 
             oldCoord = newLatLng
+
+
         }
     }, 10); // Adjust interval speed as needed
 }
@@ -947,6 +1015,22 @@ document.addEventListener('keydown', (e) => {
     const key = e.key.toLowerCase();
     if (['w', 'a', 's', 'd'].includes(key)) {
         startMovingBubble(key);
+    }
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        switch (e.key) {
+            case 'ArrowUp':
+                map.panBy([0, -100]); // Pan up by 100 pixels (adjust as necessary)
+                break;
+            case 'ArrowDown':
+                map.panBy([0, 100]); // Pan down by 100 pixels
+                break;
+            case 'ArrowLeft':
+                map.panBy([-100, 0]); // Pan left by 100 pixels
+                break;
+            case 'ArrowRight':
+                map.panBy([100, 0]); // Pan right by 100 pixels
+                break;
+        }
     }
 });
 
