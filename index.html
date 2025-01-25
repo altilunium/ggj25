@@ -47,6 +47,7 @@
 
     #conzole{
       margin-left:14px  ;
+      padding-top:20px;
     }
 
     a {
@@ -88,7 +89,7 @@
 
 
 <div id="panels">
-  <p id="conzole">Pick any map coordinate as your spawn location. Click the position to select it.</p>
+  <p id="conzole">Pick a map coordinate as your spawn location. Click the position to select it.<br><br>Make sure that your choice is on a road.</p>
 </div>
 
 <svg id="compass" viewBox="0 0 100 100">
@@ -258,7 +259,7 @@ const paintRules = [
         minzoom: 16,
         symbolizer:new protomapsL.CenteredTextSymbolizer({
             labelProps:[lang],
-            font: `400 10px ${font}`, 
+            font: `400 16px ${font}`, 
             fill: "#7a7a7a",
             padding: [2, 4], // [vertical padding, horizontal padding]
             background: "#000000", // Background box color
@@ -908,11 +909,13 @@ function onMapClick(e) {
     console.log("True goal",trueGoal)
     inspector(e.latlng)
 
-    map.setMaxZoom(18); // Set the new maximum zoom level
-    map.setMinZoom(18);
+
+
     isPlaced = true
 
     bootbox.alert("<tr><td><img src='man1.png'></td><td style='vertical-align:top'>Welcome, noble wanderer, to the enchanting realm of Bubble World.<br><br>You stand on the threshold of a grand adventure, embarking on a quest to uncover treasures beyond your wildest dreams. Let the compass, nestled at the top right of your screen, be your guiding star as you seek the fabled riches that await. But beware—your vitality is not endless, and you may find yourself in need of rest and healing along the way. <br><br>Use the WASD keys to traverse this world, and the arrow buttons to explore the map's farthest corners. <br><br>May your journey be filled with wonder and discovery. Happy wandering!</td></tr>");
+
+
 
   }
 
@@ -941,6 +944,10 @@ function onMapClick(e) {
           });
 
           bubble = L.marker(latlng, { icon: icon }).addTo(map);
+          console.log("COORRR",latlng)
+          
+          map.setView([latlng.lat,latlng.lng],18)
+
 
       } else {
           // Move the bubble to a new location
