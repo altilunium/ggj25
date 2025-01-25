@@ -4,7 +4,7 @@
   <base target="_top">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quick Start - Leaflet</title>
+  <title>???</title>
   <link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
   <script src="leaflet.js"></script>
@@ -56,6 +56,16 @@
       bottom:50 px;
       width:100px;
     }
+    #meterz {
+      position: fixed;
+    top: 105px;
+    right: 3px;
+    background-color: white;
+    z-index: 9999999;
+    width: 90px;
+    height: 20px;
+    border: 2px solid;
+    }
   </style>
 </head>
 <body>
@@ -74,6 +84,8 @@
             <!-- Center circle -->
             <circle cx="50" cy="50" r="2" fill="black" />
         </svg>
+
+<div id="meterz"></div>
 
 <div class="main">
   <div id="map"></div>
@@ -112,9 +124,12 @@
   var stepPenalty = 0.005
   var trueGoal
   var currentDirection 
+  var currentDistance
+  var checkpoints = 0
   isINTunlocked = false
   var inventory = new Set()
   isBurger = false
+  isCheckpoint = false
   isBicycle= false
   isInventory = false
 
@@ -315,8 +330,44 @@ function rotateNeedle(degree) {
         }
 
 
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    // Radius of the Earth in kilometers
+    const earthRadiusKm = 6371;
 
-function getDestinationCoordinate(lat, lon, direction, distanceKm = 10) {
+    // Convert degrees to radians
+    const toRadians = (degree) => degree * Math.PI / 180;
+
+    const lat1Rad = toRadians(lat1);
+    const lon1Rad = toRadians(lon1);
+    const lat2Rad = toRadians(lat2);
+    const lon2Rad = toRadians(lon2);
+
+    // Difference in coordinates
+    const deltaLat = lat2Rad - lat1Rad;
+    const deltaLon = lon2Rad - lon1Rad;
+
+    // Haversine formula
+    const a = Math.sin(deltaLat / 2) ** 2 +
+              Math.cos(lat1Rad) * Math.cos(lat2Rad) *
+              Math.sin(deltaLon / 2) ** 2;
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    // Distance in kilometers
+    const distanceKm = earthRadiusKm * c;
+
+    // Return distance as a string with the appropriate unit
+    if (distanceKm > 1) {
+        return `${distanceKm.toFixed(2)} km`;
+    } else {
+        const distanceMeters = (distanceKm * 1000).toFixed(0);
+        return `${distanceMeters} m`;
+    }
+}
+
+
+
+function getDestinationCoordinate(lat, lon, direction, distanceKm = 1) {
     const earthRadiusKm = 6371; // Radius of Earth in kilometers
 
     // Convert input values to radians
@@ -348,7 +399,7 @@ function getDestinationCoordinate(lat, lon, direction, distanceKm = 10) {
 
 
 function setDirection(lat, lon) {
-    const radius = 10; // 10 kilometers
+    const radius = 1; // 10 kilometers
      
 
     // Generate a pseudo-random number using the seed
@@ -467,6 +518,9 @@ function calcdirection(latA, lonA, latB, lonB) {
               else if (feature == "water_lines"){
                 slop = "waterway"
               }
+              else if (feature == "sites"){
+                slop ="amenity"
+              }
 
               else{
                 slop = feature
@@ -477,11 +531,16 @@ function calcdirection(latA, lonA, latB, lonB) {
               tagHaul.add(zz)
               globalHaul.add(zz)
             }
+
+
             else {
 
 
               if (feature == "water_lines"){
                 slop = "waterway"
+              }
+              else if (feature == "sites"){
+                slop ="school"
               }
               else{
                 slop = key
@@ -556,7 +615,23 @@ function calcdirection(latA, lonA, latB, lonB) {
       inventory.forEach((value) => {
         zHT = zHT + value + "<br><br>"
       });
+    }
 
+    meterzz = currentDistance.split(" ")
+    if ((meterzz[1] == "m") && (meterzz[0] < 10)){
+      checkpoints = checkpoints + 1
+      zHT = zHT + "Checkpoint reached : " + checkpoints + "<br>"
+      trueGoal =  setDirection(lalon.lat,lalon.lng)
+    currentDirection = calcdirection(lalon.lat,lalon.lng,trueGoal.lat,trueGoal.lng)
+    currentDistance = calculateDistance(lalon.lat,lalon.lng,trueGoal.lat,trueGoal.lng)
+    rotateNeedle(currentDirection)
+    const meterz = document.getElementById("meterz");
+    meterz.innerHTML = currentDistance
+    isCheckpoint = true
+    }
+
+    if (isCheckpoint) {
+      zHT = zHT + "Checkpoint reached : " + checkpoints + "<br>"
     }
     
 
@@ -764,9 +839,13 @@ function onMapClick(e) {
     
     createOrMoveBubble(e.latlng);
     trueGoal =  setDirection(wrapped.lat,wrapped.lng)
+    currentDirection = calcdirection(wrapped.lat,wrapped.lng,trueGoal.lat,trueGoal.lng)
+    currentDistance = calculateDistance(wrapped.lat,wrapped.lng,trueGoal.lat,trueGoal.lng)
+    rotateNeedle(currentDirection)
+    const meterz = document.getElementById("meterz");
+    meterz.innerHTML = currentDistance
     console.log("True goal",trueGoal)
-
-
+    inspector(e.latlng)
 
 
   }
@@ -843,6 +922,14 @@ function startMovingBubble(direction) {
         if (newLatLng) {
             bubble.setLatLng(newLatLng);
             currentDirection = calcdirection(newLatLng.lat,newLatLng.lng,trueGoal.lat,trueGoal.lng)
+            currentDistance = calculateDistance(newLatLng.lat,newLatLng.lng,trueGoal.lat,trueGoal.lng)
+
+            const meterz = document.getElementById("meterz");
+            meterz.innerHTML = currentDistance
+            
+
+
+            console.log("DISTANCE",currentDistance)
             console.log("C1",newLatLng.lat,newLatLng.lng)
             console.log("C2",trueGoal.lat,trueGoal.lng)
             console.log("Direction",currentDirection)
