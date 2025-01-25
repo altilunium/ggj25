@@ -144,6 +144,7 @@
   var currentDirection 
   var currentDistance
   var checkpoints = 0
+  var currentLevel = 1
   isINTunlocked = false
   var inventory = new Set()
   isBurger = false
@@ -438,7 +439,7 @@ function setDirection(lat, lon) {
     const randomDirection = seed % 360;
     console.log("DIRECTION ! ",randomDirection)
 
-    return getDestinationCoordinate(lat, lon, randomDirection) 
+    return getDestinationCoordinate(lat, lon, randomDirection, currentLevel) 
     /*
     
     // Earth's radius in kilometers
@@ -642,6 +643,7 @@ function calcdirection(latA, lonA, latB, lonB) {
     if ((meterzz[1] == "m") && (meterzz[0] < 10)){
       checkpoints = checkpoints + 1
       zHT = zHT + "Checkpoint reached : " + checkpoints + "<br>"
+      currentLevel = currentLevel + 0.4
       trueGoal =  setDirection(lalon.lat,lalon.lng)
     currentDirection = calcdirection(lalon.lat,lalon.lng,trueGoal.lat,trueGoal.lng)
     currentDistance = calculateDistance(lalon.lat,lalon.lng,trueGoal.lat,trueGoal.lng)
@@ -862,7 +864,14 @@ function getMovedCoordinate(currentCoord, coordList, direction) {
 
 function onMapClick(e) {
 
+
+
     if (isPlaced){
+      return 0
+    }
+    else if (map.getZoom() < 18){
+      alert("Please zoom in further")
+      map.setView([e.latlng.lat,e.latlng.lng],18)
       return 0
     }
 
