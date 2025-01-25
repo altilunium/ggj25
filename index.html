@@ -42,7 +42,11 @@
 
     #conzole{
       margin-left:14px  ;
+    }
 
+    a {
+      text-decoration: none;
+      color:blue;
     }
   </style>
 </head>
@@ -84,7 +88,7 @@
 <script>
 
   var globalHaul = new Set()
-  var globalSteps = 1000
+  var globalSteps = 100
   var globalINT = 11
   var stepPenalty = 0.005
   isINTunlocked = false
@@ -243,6 +247,13 @@ const paintRules = [
   map.on('click', onMapClick);
 
 
+function getInfo(x){
+  let result = x.split(" ");
+  var nya = "<a href='https://taginfo.openstreetmap.org/tags/" + result[0] + "=" + result[1] +"' target='_blank'  >" + x + "</a>"
+  return nya
+}
+
+
  function createBubble(latlng) {
 
   /*
@@ -269,13 +280,41 @@ let oldCoord
 
 
 function nomention(x){
-  if (x == "religion") {
+  if ((x == "religion") || (x == "housenumber")) {
     return false
   }
   else {
     return true
   }
 }
+
+
+
+function setDirection(lat, lon) {
+    const radius = 10; // 10 kilometers
+    const randomDirection = Math.random() * 360; // Random direction in degrees
+    
+    // Earth's radius in kilometers
+    const earthRadius = 6371; 
+
+    // Convert latitude and longitude from degrees to radians
+    const latRad = lat * Math.PI / 180;
+    const lonRad = lon * Math.PI / 180;
+
+    // Convert the random direction from degrees to radians
+    const directionRad = randomDirection * Math.PI / 180;
+
+    // Calculate the new latitude and longitude
+    const newLatRad = latRad + (radius / earthRadius);
+    const newLonRad = lonRad + (radius / earthRadius) / Math.cos(latRad);
+
+    // Convert the new coordinates back to degrees
+    const newLat = newLatRad * 180 / Math.PI;
+    const newLon = newLonRad * 180 / Math.PI;
+
+    return { lat: newLat, lon: newLon };
+}
+
 
   function inspector(lalon){
     //console.log("current coord: ",lalon)
@@ -301,7 +340,7 @@ function nomention(x){
     const sourceToFeatures = layer.queryTileFeaturesDebug(lalon.lng, lalon.lat).get("");
     console.log(sourceToFeatures);
     const list = [...sourceToFeatures.values()];
-
+    console.log(list)
     let tagHaul = new Set();
     for (let i = 0; i < list.length; i++) {
       const feature = list[i].layerName;
@@ -312,12 +351,23 @@ function nomention(x){
 
           if ((list[i].feature.props[key] != false) && (list[i].feature.props[key] != "no") && (nomention(key))  )   {
             if (key == "kind"){
+
+
               if (feature == "land"){
                 slop = "landuse"
               }
+              else if (feature == "streets"){
+                slop = "highway"
+              }
+
+              else if (feature == "water_lines"){
+                slop = "waterway"
+              }
+
               else{
                 slop = feature
               }
+
 
               var zz = slop +" "+list[i].feature.props[key]
               tagHaul.add(zz)
@@ -325,7 +375,18 @@ function nomention(x){
             }
             else {
 
-              var zz = key +" "+list[i].feature.props[key]
+
+              if (feature == "water_lines"){
+                slop = "waterway"
+              }
+              else{
+                slop = key
+              }
+
+              
+
+              var zz = slop +" "+list[i].feature.props[key]
+              console.log("FF2",zz)
               tagHaul.add(zz)
               globalHaul.add(zz)
 
@@ -396,11 +457,16 @@ function nomention(x){
     
 
     zHT = zHT + "<i>"
-    for (const value of tagHaul) {
-      zHT = zHT + value + "<br>"
+
+const sortedStrings2 = [...tagHaul].sort();
+
+    for (const value of sortedStrings2) {
+      zHT = zHT + getInfo(value) + "<br>"
 
   console.log("TAGHAUL",value);
 }
+
+
 
 zHT = zHT + "</i><br>"
 
@@ -413,8 +479,8 @@ if (zHT.includes("streets living_street")){
 }
 
 if (zHT.includes("amenity cafe")){
-  zHT = zHT + "A relaxing cafe! Bonus 50 HP!<br>"
-  globalSteps = globalSteps + 50 
+  zHT = zHT + "A relaxing cafe! +0.005 HP per step<br>"
+  globalSteps = globalSteps + 0.01 
 }
 if (zHT.includes("landuse industrial")){
   zHT = zHT + "You find yourself crossing into a sprawling expanse of industrial land, where the air is thick with the weight of pollution. The skies, once clear, now hang heavy with the darkened veil of smoke and fumes, as the relentless hum of machinery fills the air with a ceaseless, mechanical pulse. -0.005 HP per step<br><br>"
@@ -474,10 +540,12 @@ zHT = zHT + globalHaul.size + " unique places discovered : <br><i>"
 const sortedStrings = [...globalHaul].sort();
 
 for (const x of sortedStrings){
-  zHT = zHT + x + "<br>"
+  zHT = zHT + getInfo(x) + "<br>"
 }
 zHT = zHT + "</i>"
 
+
+ 
 
 
 
@@ -697,7 +765,6 @@ function stopMovingBubble() {
 const firstLink = document.querySelector('.leaflet-control-attribution a');
 console.log("zaa",firstLink)
 firstLink.style.display = 'none';
-
 
 </script>
 </body>
