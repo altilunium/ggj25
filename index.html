@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quick Start - Leaflet</title>
+  <link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="leaflet.js"></script>
+  <script src="protomaps-leaflet.js"></script> 
+  <script src="https://unpkg.com/leaflet-hash@0.2.1/leaflet-hash.js"></script>
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    #map {
+      position:fixed;
+      top:0px;
+      left:0px;
+      width:100%;
+      height:100%;
+    }
+    .leaflet-container {
+      background-color: #fff;
+    }
+
+    #panels {
+      position: absolute;
+      left:0px;
+      top:0px;
+      width: 250px;
+      height:100%;
+      background-color:white;
+      z-index: 999;
+      overflow: scroll;
+    }
+
+    #conzole{
+      margin-left:14px  ;
+
+    }
+  </style>
+</head>
+<body>
+
+<div id="panels">
+  <p id="conzole"></p>
+</div>
+
+<div class="main">
+  <div id="map"></div>
+  <div class="controls">
+    <hr/>
+    <div>
+    choose a font: 
+      <select id="font">
+          <option value="monospace">monospace</option>
+          <option value="serif">serif</option>
+          <option value="sans-serif">sans-serif</option>
+      </select>
+    </div>
+    <div>
+      choose a language:
+      <select id="lang">
+        <option value="name">name (local)</option>
+        <option value="name_en">en</option>
+        <option value="name_de">de</option>
+      </select>
+    </div>
+  </div>
+  <div>
+    <ul>
+      <li>minutely vector tile endpoint: <a href="https://vector.osm.org">vector.osm.org/shortbread_v1/{z}/{x}/{y}.mvt</a></li>
+      <li>tile contents docs: <a href="https://shortbread-tiles.org/schema/1.0/">shortbread 1.0</a></li>
+      <li>source code: <a href="https://github.com/bdon/vector.osm.org-leaflet">github.com/bdon/vector.osm.org-leaflet</a></li>
+    </ul>
+  </div>
+</div>
+<script>
+
+  var globalHaul = new Set()
+  var globalSteps = 1000
+  var globalINT = 11
+  var stepPenalty = 0.005
+  isINTunlocked = false
+  var inventory = new Set()
+  isBurger = false
+  isBicycle= false
+  isInventory = false
+
+
+  const map = L.map('map');
+  hash = new L.Hash(map);
+  if (!window.location.hash) map.setView([-6.2682, 106.9993], 13)
+
+  const popup = L.popup();
+
+const paintRules = [
+  {
+    dataLayer: "land",
+    symbolizer: new protomapsL.LineSymbolizer({
+      color: "#fafafa"
+    })
+  },
+  {
+    dataLayer: "water_polygons",
+    symbolizer: new protomapsL.PolygonSymbolizer({
+      //fill: "#bcbcbc"
+      fill: "blue"
+    })
+  },
+  {
+    dataLayer: "ocean",
+    symbolizer: new protomapsL.PolygonSymbolizer({
+      fill: "#dcdcdc"
+    })
+  },
+  {
+    dataLayer: "streets",
+    filter: (z, f) => f.props.kind === "motorway",
+    symbolizer: new protomapsL.LineSymbolizer({
+      color: "#ff0000", // Highways in red
+      width:5
+    })
+  },
+  {
+    dataLayer: "streets",
+    filter: (z, f) => f.props.kind === "highway",
+    symbolizer: new protomapsL.LineSymbolizer({
+      color: "#ff0000", // Highways in red
+      width: 3
+    })
+  },
+  {
+    dataLayer: "streets",
+    filter: (z, f) => f.props.kind === "trunk",
+    symbolizer: new protomapsL.LineSymbolizer({
+      color: "#ff0000", // Highways in red
+      width: 3
+    })
+  },
+  {
+    dataLayer: "streets",
+    filter: (z, f) => f.props.kind === "primary",
+    symbolizer: new protomapsL.LineSymbolizer({
+      color: "#ffa500", // Primary roads in orange
+      width: 2.5
+    })
+  },
+  {
+    dataLayer: "streets",
+    filter: (z, f) => f.props.kind === "secondary",
+    symbolizer: new protomapsL.LineSymbolizer({
+      color: "#ffff00", // Secondary roads in yellow
+      width: 2
+    })
+  },
+  {
+    // Catch-all rule for other street types
+    dataLayer: "streets",
+    filter: (z, f) =>
+      !["motorway","highway", "primary", "secondary"].includes(f.props.kind),
+    symbolizer: new protomapsL.LineSymbolizer({
+      color: "#cccccc", // Default color for other streets
+      width: 1
+    })
+  },
+  {
+    dataLayer: "boundaries",
+    symbolizer: new protomapsL.LineSymbolizer({
+      color: "#adadad"
+    })
+  }
+];
+
+
+  const labelRules = (font,lang) => {
+    return [
+      {
+        dataLayer:"place_labels",
+        symbolizer:new protomapsL.CenteredTextSymbolizer({
+            labelProps:[lang],
+            font: (z,f) => {
+                if (f.props.kind === 'capital') return "600 16px " + font
+                else if (f.props.kind === 'city') return "500 16px " + font
+                return "400 12px " + font
+            },
+            fill: "#5c5c5c"
+        })
+      },
+      {
+        dataLayer:"pois",
+        minzoom: 16,
+        symbolizer:new protomapsL.CenteredTextSymbolizer({
+            labelProps:[lang],
+            font: `400 10px ${font}`, 
+            fill: "#7a7a7a",
+            padding: [2, 4], // [vertical padding, horizontal padding]
+            background: "#000000", // Background box color
+            borderRadius: 2, // Rounded corners
+            border: "#cccccc", // Optional border color
+            borderWidth: 1 // Optional border width
+        })
+      }
+    ];
+  }
+
+  let font = "monospace";
+  let lang = "name";
+
+  let layer = protomapsL.leafletLayer({
+      url:'https://vector.osm.org/shortbread_v1/{z}/{x}/{y}.mvt',
+      maxDataZoom: 14,
+      paintRules:paintRules,
+      labelRules:labelRules(font,lang),
+      tasks:[document.fonts.load("12px Work Sans")],
+      attribution: "<a href='https://openstreetmap.org/copyright'>© OpenStreetMap contributors</a>"
+  })
+  layer.addTo(map) 
+
+  
+
+  const rerender = () => {
+    layer.labelRules = labelRules(font,lang);
+    layer.clearLayout();
+    layer.rerenderTiles();
+  }
+
+  document.getElementById("font").addEventListener('change', e => {
+      font = e.target.value
+      rerender();
+  })
+  document.getElementById("lang").addEventListener('change', e => {
+      lang = e.target.value
+      rerender();
+  })
+
+  map.on('click', onMapClick);
+
+
+ function createBubble(latlng) {
+
+  /*
+    const bubble = L.circleMarker(latlng, {
+      radius: 10,
+      color: "blue",
+      fillColor: "lightblue",
+      fillOpacity: 0.8
+    }).addTo(map);
+    */
+  const icon = L.divIcon({
+    html: '<img src="l.png" style="width:30px;height:30px;transform:translate(100px, 10px);">', // Replace with your image URL
+    className: 'custom-icon',
+    iconSize: [30, 30], // Adjust size to match your image
+    iconAnchor: [0, 0],
+  });
+
+  const bubble = L.marker(latlng, { icon: icon }).addTo(map);
+
+  }
+
+let bagOfCoordinate
+let oldCoord
+
+
+function nomention(x){
+  if (x == "religion") {
+    return false
+  }
+  else {
+    return true
+  }
+}
+
+  function inspector(lalon){
+    //console.log("current coord: ",lalon)
+
+    /*
+    console.log("inspect",lalon)
+    let newlalon = {}
+    newlalon.lng = lalon.lng - 0.00015
+    newlalon.lat = lalon.lat - 0.00013
+    map.createPane('topPane');
+    map.getPane('topPane').style.zIndex = 650;
+    const bubblez = L.circleMarker(newlalon, {
+      radius: 1,
+      color: "blue",
+      fillColor: "lightblue",
+      fillOpacity: 0.8,
+      pane:'topPane'
+    }).addTo(map);
+    */
+
+
+
+    const sourceToFeatures = layer.queryTileFeaturesDebug(lalon.lng, lalon.lat).get("");
+    console.log(sourceToFeatures);
+    const list = [...sourceToFeatures.values()];
+
+    let tagHaul = new Set();
+    for (let i = 0; i < list.length; i++) {
+      const feature = list[i].layerName;
+
+      if (!feature.includes("_labels")) {
+          for (const key in list[i].feature.props) {
+        if (!key.startsWith("name")){
+
+          if ((list[i].feature.props[key] != false) && (list[i].feature.props[key] != "no") && (nomention(key))  )   {
+            if (key == "kind"){
+              if (feature == "land"){
+                slop = "landuse"
+              }
+              else{
+                slop = feature
+              }
+
+              var zz = slop +" "+list[i].feature.props[key]
+              tagHaul.add(zz)
+              globalHaul.add(zz)
+            }
+            else {
+
+              var zz = key +" "+list[i].feature.props[key]
+              tagHaul.add(zz)
+              globalHaul.add(zz)
+
+            }
+
+            console.log(key, list[i].feature.props[key])
+            
+
+
+          }
+          
+        }
+        }
+
+      } 
+    
+
+
+      /*
+      if (feature == "streets"){
+        //console.log("brok")
+        //console.log(list[i].feature.geom[0])
+        bagOfCoordinate = list[i].feature.geom[0]
+      }
+      if (feature == "pois"){
+        //console.log("POIIII")
+        //console.log(list[i].feature.props)
+        //console.log("POI ROLL CALL",list[i].feature.props.length)
+
+        for (const key in list[i].feature.props) {
+        if (!key.startsWith("name")){
+          console.log(key, list[i].feature.props[key])
+        }
+        }
+      }
+
+      if (feature == "streets"){
+        //console.log("POIIII")
+        //console.log(list[i].feature.props)
+        //console.log("POI ROLL CALL",list[i].feature.props.length)
+
+        for (const key in list[i].feature.props) {
+        if (!key.startsWith("name")){
+          console.log(key, list[i].feature.props[key])
+        }
+        }
+      }
+      */
+
+
+
+
+      //console.log(`Feature ${i}:`, feature);
+    }
+
+
+    var zHT = "HP : "+globalSteps+"<br>"
+    if (isINTunlocked){
+      zHT = zHT + "INT : "+globalINT+"<br>"  
+    }
+    if (isInventory){
+      zHT = zHT + "Inventory : <br>"
+      inventory.forEach((value) => {
+        zHT = zHT + value + "<br><br>"
+      });
+
+    }
+    
+
+    zHT = zHT + "<i>"
+    for (const value of tagHaul) {
+      zHT = zHT + value + "<br>"
+
+  console.log("TAGHAUL",value);
+}
+
+zHT = zHT + "</i><br>"
+
+if (zHT.includes("landuse residential")){
+    zHT = zHT + "You step into a quiet, secluded residential enclave. The residents, watching from behind, eye you warily. Strangers are unwelcome in this close-knit corner of the world.<br><br>"
+}
+
+if (zHT.includes("streets living_street")){
+    zHT = zHT + "As you step onto the bustling street, it seems to pulse with life. The air hums with the laughter and chatter of children, their playful voices echoing through the vibrant scene. They dart across the living street like carefree birds, oblivious to the world around them. You must tread carefully, your every step weighed with the awareness that a single misstep could disrupt the delicate dance of their joy.<br><br>"
+}
+
+if (zHT.includes("amenity cafe")){
+  zHT = zHT + "A relaxing cafe! Bonus 50 HP!<br>"
+  globalSteps = globalSteps + 50 
+}
+if (zHT.includes("landuse industrial")){
+  zHT = zHT + "You find yourself crossing into a sprawling expanse of industrial land, where the air is thick with the weight of pollution. The skies, once clear, now hang heavy with the darkened veil of smoke and fumes, as the relentless hum of machinery fills the air with a ceaseless, mechanical pulse. -0.005 HP per step<br><br>"
+  globalSteps = globalSteps - 0.5 
+}
+if (zHT.includes("amenity marketplace")){
+  zHT = zHT + "What an absolutely colossal marketplace, stretching endlessly in every direction like a labyrinth of opportunities and oddities! It's practically bursting at the seams with goods and trinkets. Time to replenish your dwindling stockpile. +0.05 HP per step<br><br>"
+  globalSteps = globalSteps + 0.05
+}
+if (zHT.includes("amenity clinic")){
+  zHT = zHT + "You've found a clinic! It's time to heal! +0.09 HP per step<br><br>"
+  globalSteps = globalSteps + 0.09
+}
+if (zHT.includes("amenity hospital")){
+  zHT = zHT + "You've found a hospital! It's time to heal! +0.2 HP per step<br><br>"
+  globalSteps = globalSteps + 0.2
+}
+if (zHT.includes("amenity school")){
+  zHT = zHT + "You see a school over there. Your thirst for knowledge and wisdom has led you there. +0.0001 INT per step<br><br>"
+  globalSteps = globalSteps + 0.2
+  globalINT = globalINT + 0.0001
+  isINTunlocked = true
+}
+if (zHT.includes("amenity hospital")){
+  zHT = zHT + "You've found a hospital! It's time to heal! +0.2 HP per step<br><br>"
+  globalSteps = globalSteps + 0.2
+}
+if (zHT.includes("cuisine burger")){
+
+    zHT = zHT + "A masked figure approaches you. 'The world beyond is perilous, take this instead' he says, handing you a mysterious item wrapped in an intricately designed briefcase. With caution, you lift the lid, revealing what lies inside.<br><br>"
+    zHT = zHT + "You received a BURGER!<br><br>"
+    isBurger = true
+    inventory.add("BURGER")
+    isInventory = true
+}
+if (zHT.includes("bicycle yes")){
+    zHT = zHT + "A young boy, accompanied by a lively group of his friends, approaches you with a confident stride. His eyes gleam with mischief as he calls out, 'Hey there! How about a free bike? Take this—it's yours!' His voice is filled with the eager excitement of someone offering a gift, as his friends cheer quietly behind him, watching the exchange unfold.<br><br>"
+    zHT = zHT + "You received an ACRO BIKE! Your movement speed is moderately improved!<br><br>"
+    inventory.add("ACRO BIKE")
+    isInventory = true
+    if (!isBicycle){
+      isBicycle = true
+      stepPenalty = 0.0048
+    }
+    
+}
+
+
+
+
+
+
+
+
+zHT = zHT + globalHaul.size + " unique places discovered : <br><i>"
+
+const sortedStrings = [...globalHaul].sort();
+
+for (const x of sortedStrings){
+  zHT = zHT + x + "<br>"
+}
+zHT = zHT + "</i>"
+
+
+
+
+const element = document.getElementById("conzole");
+element.innerHTML = zHT
+
+
+
+
+
+
+
+
+    //console.log(list);
+    
+    const content = list.map(f => `${f.layerName}.${f.feature.props.kind || ""}`).join("|");
+    //console.log(content)
+    
+    if (content.includes("streets")){
+      console.log("LEGAL MOVE")
+      globalSteps = globalSteps - stepPenalty
+    }
+    else{
+      console.log("ILLEGAL MOVE")
+      bubble.setLatLng(oldCoord)
+      element.innerHTML = "Access denied!"
+      
+    }
+
+    if (globalSteps <= 0) {
+      alert("Game over!")
+    }
+
+  }
+
+
+function getMovedCoordinate(currentCoord, coordList, direction) {
+    const step = 0.0005; // Adjust step size as needed
+    let newCoord;
+
+    switch (direction) {
+        case 'w': // Up
+            newCoord = [currentCoord[0] + step, currentCoord[1]];
+            break;
+        case 'a': // Left
+            newCoord = [currentCoord[0], currentCoord[1] - step];
+            break;
+        case 's': // Down
+            newCoord = [currentCoord[0] - step, currentCoord[1]];
+            break;
+        case 'd': // Right
+            newCoord = [currentCoord[0], currentCoord[1] + step];
+            break;
+    }
+
+    if (!newCoord) return null;
+
+    // Find the closest matching coordinate in the list
+    let closestCoord = null;
+    let minDistance = Infinity;
+
+    coordList.forEach(coord => {
+        const distance = Math.sqrt(
+            Math.pow(coord[0] - newCoord[0], 2) +
+            Math.pow(coord[1] - newCoord[1], 2)
+        );
+
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestCoord = coord;
+        }
+    });
+
+    return closestCoord;
+}
+
+
+
+function onMapClick(e) {
+    
+    const wrapped = map.wrapLatLng(e.latlng);
+    const sourceToFeatures = layer.queryTileFeaturesDebug(wrapped.lng, wrapped.lat).get("");
+    console.log(sourceToFeatures);
+    const list = [...sourceToFeatures.values()];
+
+    for (let i = 0; i < list.length; i++) {
+      const feature = list[i].layerName;
+      console.log("currently :",feature)
+      if (feature == "streets"){
+        console.log("brok")
+        console.log(list[i].feature.geom[0])
+      }
+      if (feature == "pois"){
+        console.log("POIIII")
+        console.log(list[i].feature.props)
+      }
+      console.log(`Feature ${i}:`, feature);
+    }
+
+
+
+
+    console.log(list);
+    const content = list.map(f => `${f.layerName}>${f.feature.props.kind || ""}`).join("<br/>");
+    /*
+    popup
+      .setLatLng(e.latlng)
+      .setContent(content)
+      .openOn(map);
+    */
+
+    
+    createOrMoveBubble(e.latlng);
+
+
+
+  }
+
+  let bubble = null;
+
+  function createOrMoveBubble(latlng) {
+      if (!bubble) {
+
+        /*
+          // Create the bubble if it doesn't exist
+          bubble = L.circleMarker(latlng, {
+              radius: 10,
+              color: "blue",
+              fillColor: "lightblue",
+              fillOpacity: 0.8
+          }).addTo(map);
+*/
+
+
+
+
+          const icon = L.divIcon({
+            html: '<img src="l.png" style="width:100px;height:100px;">', // Replace with your image URL
+            className: 'custom-icon',
+            iconSize: [60, 60], // Adjust size to match your image
+          });
+
+          bubble = L.marker(latlng, { icon: icon }).addTo(map);
+
+      } else {
+          // Move the bubble to a new location
+          bubble.setLatLng(latlng);
+      }
+  }
+
+// Function to continuously move the bubble
+let moveInterval = null;
+function startMovingBubble(direction) {
+    if (!bubble) return; // Do nothing if bubble doesn't exist
+
+    if (moveInterval) clearInterval(moveInterval); // Clear any existing interval
+
+    const step = 0.00001; // Adjust step size as needed
+
+    moveInterval = setInterval(() => {
+        const currentLatLng = bubble.getLatLng();
+        oldCoord = bubble.getLatLng()
+
+        let newLatLng;
+        let newLatLngg;
+        //newLatLngg = getMovedCoordinate(currentLatLng,bagOfCoordinate, direction)
+        //console.log("newcoord: ", newLatLng2)
+        switch (direction) {
+          
+          
+            case 'w': // Up
+                newLatLng = L.latLng(currentLatLng.lat + step, currentLatLng.lng);
+                console.log("w")
+                break;
+            case 'a': // Left
+                newLatLng = L.latLng(currentLatLng.lat, currentLatLng.lng - step);
+                break;
+            case 's': // Down
+                newLatLng = L.latLng(currentLatLng.lat - step, currentLatLng.lng);
+                break;
+            case 'd': // Right
+                newLatLng = L.latLng(currentLatLng.lat, currentLatLng.lng + step);
+                break;
+        }
+
+        
+
+        if (newLatLng) {
+            bubble.setLatLng(newLatLng);
+            inspector(newLatLng);
+            oldCoord = newLatLng
+        }
+    }, 10); // Adjust interval speed as needed
+}
+
+
+// Add keyboard event listeners for WASD controls
+document.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    if (['w', 'a', 's', 'd'].includes(key)) {
+        startMovingBubble(key);
+    }
+});
+
+document.addEventListener('keyup', (e) => {
+    stopMovingBubble();
+});
+
+function stopMovingBubble() {
+    if (moveInterval) {
+        clearInterval(moveInterval);
+        moveInterval = null;
+    }
+}
+
+
+const firstLink = document.querySelector('.leaflet-control-attribution a');
+console.log("zaa",firstLink)
+firstLink.style.display = 'none';
+
+
+</script>
+</body>
+</html>
