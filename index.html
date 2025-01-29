@@ -140,11 +140,14 @@
   var globalSteps = 100
   var globalINT = 11
   var stepPenalty = 0.005
+  var currentMoney = 0
   var trueGoal
   var currentDirection 
   var currentDistance
+  var currentCoordinate
   var checkpoints = 0
   var currentLevel = 1
+  var stepSpeed = 0.00001
   isINTunlocked = false
   var inventory = new Set()
   isBurger = false
@@ -223,10 +226,18 @@ const paintRules = [
     })
   },
   {
+    dataLayer: "streets",
+    filter: (z, f) => f.props.kind === "tertiary",
+    symbolizer: new protomapsL.LineSymbolizer({
+      color: "#a8a7a7", // Secondary roads in yellow
+      width: 2
+    })
+  },
+  {
     // Catch-all rule for other street types
     dataLayer: "streets",
     filter: (z, f) =>
-      !["motorway","highway", "primary", "secondary"].includes(f.props.kind),
+      !["motorway","highway", "primary", "secondary","tertiary"].includes(f.props.kind),
     symbolizer: new protomapsL.LineSymbolizer({
       color: "#cccccc", // Default color for other streets
       width: 1
@@ -249,8 +260,8 @@ const paintRules = [
             labelProps:[lang],
             font: (z,f) => {
                 if (f.props.kind === 'capital') return "600 16px " + font
-                else if (f.props.kind === 'city') return "500 16px " + font
-                return "400 12px " + font
+                else if (f.props.kind === 'city') return "600 16px " + font
+                return "600 20px " + font
             },
             fill: "#5c5c5c"
         })
@@ -494,6 +505,7 @@ function calcdirection(latA, lonA, latB, lonB) {
 
 
   function inspector(lalon){
+    currentCoordinate = lalon
     //console.log("current coord: ",lalon)
 
     /*
@@ -642,8 +654,12 @@ function calcdirection(latA, lonA, latB, lonB) {
     meterzz = currentDistance.split(" ")
     if ((meterzz[1] == "m") && (meterzz[0] < 10)){
       checkpoints = checkpoints + 1
-      zHT = zHT + "Checkpoint reached : " + checkpoints + "<br>"
+      zHT = zHT + "Checkpointz reached : " + checkpoints + "<br>"
+
+      currentMoney = currentLevel * 2800
       currentLevel = currentLevel + 0.4
+      
+
       trueGoal =  setDirection(lalon.lat,lalon.lng)
     currentDirection = calcdirection(lalon.lat,lalon.lng,trueGoal.lat,trueGoal.lng)
     currentDistance = calculateDistance(lalon.lat,lalon.lng,trueGoal.lat,trueGoal.lng)
@@ -653,14 +669,36 @@ function calcdirection(latA, lonA, latB, lonB) {
     isCheckpoint = true
     //alert("Congratulations! You have discovered a long-awaited checkpoint on your journey. Now, continue onward with purpose, for there is yet another to uncover.")
 
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${currentCoordinate.lat}&lon=${currentCoordinate.lng}&zoom=18&format=jsonv2`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Failed to fetch data");
+            }
+            return response.json();
+        })
+        .then(data => {
 
-     bootbox.alert("<tr><td><img src='man2.png'></td><td style='vertical-align:top'>Ah, congratulations, brave soul! You've finally arrived at your destination, victorious and unscathed, or at least mostly unscathed!<br><br>Alas, it appears the grand treasure has eluded you this time.<br><br>But fret not! For though the glittering prize is not here, you do find the faintest of clues—whispers of where it might have wandered off to.<br><br> The journey is far from over, my friend. So, steel yourself, gather your courage, and continue forth. Remember, the road to glory is paved with setbacks, mishaps, and the occasional misplaced treasure chest. <br><br>Keep going, and never, ever give up!</td></tr>");
+            //alert(JSON.stringify(data, null, 2));
+          //alert(data.display_name)
+
+
+          bootbox.alert("<tr><td><img src='man2.png'></td><td style='vertical-align:top;padding-left:34px'><h4>"+data.display_name+"</h4><br>Ah, congratulations, brave soul! You've finally arrived at your destination, victorious and unscathed, or at least mostly unscathed!<br><br>Alas, it appears the grand treasure has eluded you this time.<br><br>But fret not! For though the glittering prize is not here, you do find the faintest of clues—whispers of where it might have wandered off to.<br><br> The journey is far from over, my friend. So, steel yourself, gather your courage, and continue forth. Remember, the road to glory is paved with setbacks, mishaps, and the occasional misplaced treasure chest. <br><br>Keep going, and never, ever give up!</td></tr>");
+
+
+        })
+        .catch(error => {
+            alert("Error: " + error.message);
+        });
+
+
+     
 
 
     }
 
     if (isCheckpoint) {
       zHT = zHT + "Checkpoint reached : " + checkpoints + "<br>"
+      zHT = zHT + "Money : " + currentMoney + "<br>"
     }
     
 
@@ -677,6 +715,22 @@ const sortedStrings2 = [...tagHaul].sort();
 
 
 zHT = zHT + "</i><br>"
+
+
+/*
+if (zHT.includes("highway secondary")){
+  stepSpeed = 0.0001
+}
+else if (zHT.includes("highway trunk")){
+  stepSpeed = 0.0002
+}
+else {
+  stepSpeed = 0.00001
+}
+*/
+
+
+
 
 if (zHT.includes("landuse residential")){
     zHT = zHT + "You step into a quiet, secluded residential enclave. The residents, watching from behind, eye you warily. Strangers are unwelcome in this close-knit corner of the world.<br><br>"
@@ -731,12 +785,6 @@ if (zHT.includes("cuisine burger")){
     isInventory = true
 }
 if (zHT.includes("bicycle yes")){
-
-  /*
-    zHT = zHT + "A young boy, accompanied by a lively group of his friends, approaches you with a confident stride. His eyes gleam with mischief as he calls out, 'Hey there! How about a free bike? Take this—it's yours!' His voice is filled with the eager excitement of someone offering a gift, as his friends cheer quietly behind him, watching the exchange unfold.<br><br>"
-    zHT = zHT + "You received an ACRO BIKE! Your movement speed is moderately improved!<br><br>"
-  */
-   
     isInventory = true
     if (!isBicycle){
          bootbox.alert("<h1>bicycle=yes</h1><br><i>Roads and other objects accessible to cyclists, but not explicitly designated/signed for their use</i><br><hr>A young boy, accompanied by a lively group of his friends, approaches you with a confident stride. His eyes gleam with mischief as he calls out, 'Hey there! How about a free bike? Take this—it's yours!' His voice is filled with the eager excitement of someone offering a gift, as his friends cheer quietly behind him, watching the exchange unfold.<br><br>You received a BIKE! Your movement speed is moderately improved!");
@@ -971,7 +1019,7 @@ function startMovingBubble(direction) {
 
     if (moveInterval) clearInterval(moveInterval); // Clear any existing interval
 
-    const step = 0.00001; // Adjust step size as needed
+    var step = stepSpeed; // Adjust step size as needed
 
     moveInterval = setInterval(() => {
         const currentLatLng = bubble.getLatLng();
@@ -1032,7 +1080,7 @@ document.addEventListener('keydown', (e) => {
     if (['w', 'a', 's', 'd'].includes(key)) {
         startMovingBubble(key);
     }
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+    else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         switch (e.key) {
             case 'ArrowUp':
                 map.panBy([0, -100]); // Pan up by 100 pixels (adjust as necessary)
@@ -1048,6 +1096,44 @@ document.addEventListener('keydown', (e) => {
                 break;
         }
     }
+
+    else if (['e'].includes(key)) {    
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${currentCoordinate.lat}&lon=${currentCoordinate.lng}&zoom=18&format=jsonv2`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error("Failed to fetch data");
+            }
+            return response.json();
+        })
+        .then(data => {
+
+            //alert(JSON.stringify(data, null, 2));
+          alert(data.display_name)
+        })
+        .catch(error => {
+            alert("Error: " + error.message);
+        });
+    }
+
+
+    else if (['r'].includes(key)) {    
+
+
+lalon = currentCoordinate
+
+
+ trueGoal =  setDirection(lalon.lat,lalon.lng)
+    currentDirection = calcdirection(lalon.lat,lalon.lng,trueGoal.lat,trueGoal.lng)
+    currentDistance = calculateDistance(lalon.lat,lalon.lng,trueGoal.lat,trueGoal.lng)
+    rotateNeedle(currentDirection)
+    const meterz = document.getElementById("meterz");
+    meterz.innerHTML = currentDistance
+
+
+    }
+
+
+
 });
 
 document.addEventListener('keyup', (e) => {
